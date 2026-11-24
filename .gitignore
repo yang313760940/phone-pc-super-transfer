@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 上传的临时音频
+server/uploads/
+
+# 证书备份与探测中间产物
+server/certs/*.bak
+server/_https*
+server/_lan_probe*
+
+# 插件缓存
+.dsh-mattskillsdeck-cache/
+.dsh-write-probe
