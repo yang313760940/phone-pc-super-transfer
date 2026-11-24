@@ -21,6 +21,29 @@ DEVICE = "cpu"
 COMPUTE_TYPE = "int8"
 
 _model = None
+_t2s = None
+
+
+def _to_simplified(text: str) -> str:
+    """繁→简转换：Whisper 中文常输出繁体，统一转简体。
+    懒加载并缓存 OpenCC；若未安装则原样返回（不阻断转写）。"""
+    if not text:
+        return text
+    global _t2s
+    if _t2s is None:
+        try:
+            from opencc import OpenCC
+            _t2s = OpenCC("t2s")
+        except Exception as exc:  # 缺依赖时降级
+            print("[asr] opencc 不可用，跳过繁转简: %s" % exc)
+            _t2s = False
+    if _t2s is False:
+        return text
+    try:
+        return _t2s.convert(text)
+    except Exception as exc:
+        print("[asr] 繁转简失败，保留原文: %s" % exc)
+        return text
 
 
 class DecodeError(RuntimeError):
@@ -63,7 +86,7 @@ def transcribe(path: str) -> dict:
             raise DecodeError("音频解码失败: %s" % msg) from exc
         raise AsrError("识别失败: %s" % msg) from exc
 
-    text = "".join(parts)
+    text = _to_simplified("".join(parts))
     duration_ms = int((time.perf_counter() - started) * 1000)
     return {"text": text, "duration_ms": duration_ms}
 

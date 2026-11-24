@@ -9,7 +9,7 @@ Set-Location $root
 $web = (Resolve-Path web).Path
 $srv = (Resolve-Path server).Path
 
-python -m PyInstaller --noconfirm --clean --windowed --name VoiceSendServer `
+python -m PyInstaller --noconfirm --clean --name VoiceSendServer `
   --distpath dist_exe --workpath build_exe --specpath build_exe `
   --add-data "$web;web" `
   --collect-all faster_whisper --collect-all ctranslate2 --collect-all av --collect-all onnxruntime `

@@ -70,11 +70,32 @@ def main() -> None:
 
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8443"))
-    # 证书在 data/certs，服务需要它；把 app 的默认 cert 目录指过去（run_https 用不到，这里自管）
-    srv = app.serve(host=host, port=port, tls_context=ctx)
+
+    # 端口占用检测：避免"重复双击"时静默卡住/闪退，给出明确提示
+    import socket
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        probe.bind((host, port))
+    except OSError:
+        print("=" * 56)
+        print(" 启动失败：端口 %d 已被占用。" % port)
+        print(" 你很可能已经双击过一次，本程序已经在运行了。")
+        print(" 请查看任务栏/其他窗口里的 VoiceSendServer 黑窗；")
+        print(" 或先关闭已有的那个，再重新双击。")
+        print("=" * 56)
+        input("按回车键退出…")
+        raise SystemExit(1)
+    finally:
+        probe.close()
+
+    try:
+        srv = app.serve(host=host, port=port, tls_context=ctx)
+    except OSError as e:
+        print("启动失败：无法监听端口 %d：%s" % (port, e))
+        input("按回车键退出…")
+        raise SystemExit(1)
 
     # 打印手机访问地址
-    import socket
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect(("8.8.8.8", 80)); ip = s.getsockname()[0]
@@ -83,12 +104,15 @@ def main() -> None:
     finally:
         s.close()
     print("=" * 56)
-    print(" 手机与电脑连同一局域网，用手机 App（VoiceSend）填地址：")
+    print(" 服务已启动。手机与电脑连同一局域网，用手机 App（VoiceSend）填地址：")
     print("   https://%s:%d" % (ip, port))
     print(" 首次连接 App 会自动信任本机证书；无需其他设置。")
     print(" 保持本窗口开启即为运行中；关闭窗口即停止服务。")
     print("=" * 56)
-    srv.serve_forever()
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":

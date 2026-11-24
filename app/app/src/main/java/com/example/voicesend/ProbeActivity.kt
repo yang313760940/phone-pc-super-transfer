@@ -51,6 +51,8 @@ class ProbeActivity : AppCompatActivity() {
     private var lastAudio: File? = null
     private var recording = false
     private var startedAt = 0L
+    private var certChanged = false
+    private var retryText: TextView? = null
 
     // 视图
     private lateinit var recordBtn: FrameLayout
@@ -249,7 +251,17 @@ class ProbeActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.topMargin = dp(16) }
         }
         val retryBtn = pillBtn("重试", R.drawable.ic_refresh, solid = true, dangerStyle = true)
-        retryBtn.setOnClickListener { lastAudio?.let { showSending(); upload(it) } }
+        retryText = retryBtn.getChildAt(retryBtn.childCount - 1) as TextView
+        retryBtn.setOnClickListener {
+            if (certChanged) {
+                // 证书指纹变了：清除记住的指纹让 TOFU 重新信任，再重试
+                val host = currentHost()
+                if (host != null) getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .remove("certfp_$host").apply()
+                certChanged = false
+            }
+            lastAudio?.let { showSending(); upload(it) }
+        }
         val redoBtn = pillBtn("重新录音", 0, solid = false)
         redoBtn.setOnClickListener { resetToIdle() }
         eActions.addView(retryBtn, LinearLayout.LayoutParams(0, dp(52), 1f).also { it.rightMargin = dp(10) })
@@ -327,6 +339,8 @@ class ProbeActivity : AppCompatActivity() {
     }
 
     private fun showError(msg: String) {
+        certChanged = msg.contains("证书已变化") || msg.contains("指纹不一致")
+        retryText?.text = if (certChanged) "重新信任并重试" else "重试"
         errorCard.visibility = View.VISIBLE
         errorDesc.text = msg
         errorCard.announceForAccessibility("发送失败：$msg")
@@ -334,6 +348,11 @@ class ProbeActivity : AppCompatActivity() {
         statusLine.text = "失败 · 网络或证书错误"; statusLine.setTextColor(c(R.color.danger))
         recordBtn.isEnabled = true
         setRecordVisual(recording = false)
+    }
+
+    private fun currentHost(): String? {
+        val raw = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_URL, "") ?: return null
+        return try { java.net.URL(normalizeServerUrl(raw)).host } catch (t: Throwable) { null }
     }
 
     private fun showResult(text: String, durMs: Int) {
