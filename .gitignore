@@ -6,6 +6,10 @@ __pycache__/
 # 上传的临时音频
 server/uploads/
 
+# 转写文字落地（运行时产物，#05）
+server/latest.txt
+server/history.txt
+
 # 证书备份与探测中间产物
 server/certs/*.bak
 server/_https*

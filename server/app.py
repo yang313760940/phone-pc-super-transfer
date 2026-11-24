@@ -7,8 +7,11 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
+import subprocess
+import sys
 import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -17,6 +20,64 @@ MAX_BYTES = 25 * 1024 * 1024  # 单段上限 25 MB，规格契约。
 HERE = Path(__file__).resolve().parent
 WEB_ROOT = HERE.parent / "web"
 STORE_DIR = Path(os.environ.get("VOICE_STORE_DIR", HERE / "uploads"))
+
+# 实施票 #05：转写文字落到电脑——剪贴板 + 本地文件备份
+LATEST_TXT = HERE / "latest.txt"
+HISTORY_TXT = HERE / "history.txt"
+
+
+def _set_clipboard(text: str) -> bool:
+    """把文字写入电脑剪贴板。优先 tkinter（标准库），退回 PowerShell Set-Clipboard。
+    任何失败都返回 False，绝不抛出，避免影响对手机的响应。"""
+    # 1) tkinter 方案
+    try:
+        import tkinter
+        root = tkinter.Tk()
+        root.withdraw()
+        root.clipboard_clear()
+        root.clipboard_append(text)
+        root.update()  # 必须 update，否则关闭后剪贴板可能丢内容
+        root.destroy()
+        return True
+    except Exception as exc:
+        print("[clipboard] tkinter 失败: %s" % exc)
+    # 2) PowerShell 兜底（Windows）
+    if sys.platform.startswith("win"):
+        try:
+            # 用 UTF-8 base64 传参，避免中文经命令行参数的编码问题
+            import base64
+            b64 = base64.b64encode(text.encode("utf-8")).decode("ascii")
+            ps = (
+                "$t=[Text.Encoding]::UTF8.GetString("
+                "[Convert]::FromBase64String('%s'));"
+                "Set-Clipboard -Value $t" % b64
+            )
+            subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                           check=False, timeout=10,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except Exception as exc:
+            print("[clipboard] PowerShell 失败: %s" % exc)
+    return False
+
+
+def deliver_to_computer(text: str) -> None:
+    """转写文字落到电脑：写剪贴板 + 覆盖 latest.txt + 追加 history.txt。
+    每步失败都只记日志，不影响对手机端的响应。"""
+    if not text:
+        return
+    ok = _set_clipboard(text)
+    print("[deliver] clipboard %s, len=%d" % ("ok" if ok else "FAILED", len(text)))
+    try:
+        LATEST_TXT.write_text(text, encoding="utf-8")
+    except Exception as exc:
+        print("[deliver] latest.txt 写入失败: %s" % exc)
+    try:
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(HISTORY_TXT, "a", encoding="utf-8") as f:
+            f.write("[%s] %s\n" % (ts, text.replace("\n", " ")))
+    except Exception as exc:
+        print("[deliver] history.txt 追加失败: %s" % exc)
 
 # 转写后端：默认占位；#04 会替换成真实 asr 实现。
 _transcribe = None
@@ -167,6 +228,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             result = _transcribe(tmp_path)
+            deliver_to_computer(result["text"])  # #05：文字落到电脑（剪贴板 + 文件备份）
             _json(self, 200, {"ok": True, "text": result["text"], "duration_ms": int(result["duration_ms"])})
         except StageError as exc:
             status = 422 if exc.stage == "decode" else 500
