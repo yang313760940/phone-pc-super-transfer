@@ -1,0 +1,7 @@
+listening on 127.0.0.1:0 (https=False)
+[23/Nov/2026 22:12:33] upload ok: zh_test.wav bytes=270478 -> D:\AI工程\手机电脑传送\server\uploads\recv-mocqdco2.wav
+[asr] loading model size=small device=cpu compute=int8
+[asr] model ready
+[23/Nov/2026 22:12:36] "POST /upload HTTP/1.1" 200 -
+STATUS 200
+RESP {"ok": true, "text": "今天下午三点开会,请把手机语音转成文字发给我。", "duration_ms": 1566}

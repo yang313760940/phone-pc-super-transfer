@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>手机语音 → 电脑转写</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         max-width: 640px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+  h1 { font-size: 1.2rem; }
+  button { font-size: 1rem; padding: 12px 18px; border-radius: 10px; border: 1px solid #888;
+           background: #2d6cdf; color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: inherit; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+  #status { min-height: 1.4em; color: #c47f00; }
+  #result { white-space: pre-wrap; word-break: break-word; border: 1px solid #888;
+            border-radius: 10px; padding: 12px; min-height: 4em; margin-top: 8px; }
+  .hint { color: #888; font-size: .85rem; }
+</style>
+</head>
+<body>
+<h1>手机语音 → 电脑转写</h1>
+<p class="hint">录一段中文语音，停止后自动发送到电脑转写。结果显示在下方，可复制。</p>
+
+<div class="row">
+  <button id="recBtn">开始录音</button>
+  <button id="undoBtn" class="secondary" disabled>重录</button>
+</div>
+<div id="status" data-state="idle"></div>
+
+<div id="result" aria-live="polite"></div>
+<div class="row">
+  <button id="copyBtn" class="secondary" disabled>复制</button>
+  <button id="retryBtn" class="secondary" hidden>重试</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var recBtn = document.getElementById("recBtn");
+  var undoBtn = document.getElementById("undoBtn");
+  var copyBtn = document.getElementById("copyBtn");
+  var retryBtn = document.getElementById("retryBtn");
+  var statusEl = document.getElementById("status");
+  var resultEl = document.getElementById("result");
+
+  var recorder = null;
+  var stream = null;
+  var chunks = [];
+  var lastBlob = null;   // 失败重试复用同一段音频，不要求重录
+  var lastMime = "";
+
+  // 状态机：idle | recording | sending | done | error
+  var state = "idle";
+  var inFlight = false;   // 请求进行中标记，与显示状态解耦，避免“整理音频”阶段吞掉真正的发送
+  function setState(next, text) {
+    state = next;
+    statusEl.setAttribute("data-state", next);
+    statusEl.textContent = text || "";
+  }
+  function currentState() { return state; }
+
+  function pickMime() {
+    var cands = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+    for (var i = 0; i < cands.length; i++) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(cands[i])) {
+        return cands[i];
+      }
+    }
+    return ""; // 交给浏览器默认
+  }
+
+  function startRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setState("error", "此浏览器不支持录音接口（需 HTTPS 或 localhost）。");
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
+      stream = s;
+      chunks = [];
+      lastMime = pickMime();
+      try {
+        recorder = lastMime ? new MediaRecorder(stream, { mimeType: lastMime })
+                            : new MediaRecorder(stream);
+      } catch (e) {
+        recorder = new MediaRecorder(stream);
+      }
+      recorder.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
+      recorder.onstop = function () {
+        stopStream();
+        var type = (recorder && recorder.mimeType) || lastMime || "audio/webm";
+        lastBlob = new Blob(chunks, { type: type });
+        // 暴露真实 mimeType 供 #04 记录
+        window.__lastRecordedMime = type;
+        console.log("recorded mime=" + type + " bytes=" + lastBlob.size);
+        recBtn.textContent = "开始录音";
+        recBtn.disabled = false;
+        undoBtn.disabled = false;
+        if (!lastBlob.size) { setState("error", "没录到音频，请重试。"); return; }
+        send(lastBlob);
+      };
+      recorder.start();
+      recBtn.textContent = "停止并发送";
+      undoBtn.disabled = true;
+      setState("recording", "录音中…");
+    }).catch(function (err) {
+      setState("error", "无法打开麦克风：" + (err && err.message ? err.message : err));
+    });
+  }
+
+  function stopStream() {
+    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+  }
+
+  function stopRecording() {
+    if (recorder && recorder.state === "recording") {
+      setState("sending", "整理音频…");
+      recorder.stop();
+    }
+  }
+
+  function send(blob) {
+    if (inFlight) return;
+    inFlight = true;
+    setState("sending", "发送中…");
+    retryBtn.hidden = true;
+    copyBtn.disabled = true;
+    resultEl.textContent = "";
+
+    var fd = new FormData();
+    fd.append("audio", blob, "clip" + (blob.type.indexOf("mp4") >= 0 ? ".m4a" : ".webm"));
+    fd.append("filename", "clip-from-phone");
+
+    fetch("/upload", { method: "POST", body: fd })
+      .then(function (resp) { return resp.json().then(function (j) { return { status: resp.status, json: j }; }); })
+      .then(function (r) {
+        inFlight = false;
+        if (r.json && r.json.ok) {
+          setState("done", "转写完成（" + (r.json.duration_ms || 0) + " ms）");
+          resultEl.textContent = r.json.text || "（空）";
+          copyBtn.disabled = !(r.json.text);
+          retryBtn.hidden = true;
+        } else {
+          showError(r.json && r.json.error ? r.json.error : "未知错误");
+        }
+      })
+      .catch(function (err) {
+        inFlight = false;
+        showError("网络或服务错误：" + (err && err.message ? err.message : err));
+      });
+  }
+
+  function showError(msg) {
+    setState("error", "失败：" + msg);
+    retryBtn.hidden = false;
+  }
+
+  recBtn.addEventListener("click", function () {
+    if (state === "recording") { stopRecording(); }
+    else if (!inFlight) { startRecording(); }
+  });
+
+  undoBtn.addEventListener("click", function () {
+    lastBlob = null;
+    resultEl.textContent = "";
+    copyBtn.disabled = true;
+    retryBtn.hidden = true;
+    undoBtn.disabled = true;
+    setState("idle", "");
+  });
+
+  retryBtn.addEventListener("click", function () {
+    if (lastBlob && !inFlight) { send(lastBlob); }
+    else if (!lastBlob) { setState("error", "没有可重试的音频。"); }
+  });
+
+  copyBtn.addEventListener("click", function () {
+    var text = resultEl.textContent || "";
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { setState("done", "已复制"); })
+        .catch(function () { fallbackCopy(text); });
+    } else { fallbackCopy(text); }
+  });
+
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); setState("done", "已复制"); }
+    catch (e) { setState("error", "复制失败，请手动选择文字。"); }
+    document.body.removeChild(ta);
+  }
+
+  // 供自动化验收读取的最小状态接口（不影响正常使用）
+  window.__voicePage = {
+    state: currentState,
+    resultText: function () { return resultEl.textContent || ""; },
+    hasBlob: function () { return !!lastBlob; },
+    errorVisible: function () { return state === "error" && !retryBtn.hidden; }
+  };
+})();
+</script>
+</body>
+</html>

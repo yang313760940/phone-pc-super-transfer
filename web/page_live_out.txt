@@ -1,0 +1,2 @@
+INFO state=done text="（空）"
+RESULT: ALL PASS (页面已打通真实 /upload)

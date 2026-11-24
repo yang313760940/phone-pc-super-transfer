@@ -1,0 +1,5 @@
+PASS | 验收1 可录可停并发送 | recordState=recording afterStop=done hasBlob=true
+PASS | 验收2 显示文字并可复制 | text="这是一段模拟的转写文字，用于验收..." copyBtnDisabled=false clip="这是一段模拟的转写文字，用于验收"
+PASS | 验收3 失败显示错误并重试成功 | errVisible=true retryHidden=false afterRetryOK=true
+PASS | 验收4 无第三方脚本 | externalScripts=[]
+RESULT: ALL PASS

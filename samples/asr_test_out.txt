@@ -1,0 +1,6 @@
+[asr] loading model size=small device=cpu compute=int8
+[asr] model ready
+验收1 transcribe -> 今天下午三点开会,请把手机语音转成文字发给我。 dur= 1560 PASS
+验收2 offline cached transcribe -> 今天下午三点开会,请把手机语音转成文字发 PASS
+验收3 broken -> DecodeError PASS: 音频解码失败: [Errno 1094995529] Invalid data found when
+RESULT: ALL PASS
