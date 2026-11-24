@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 设计令牌（浅色） -->
+    <color name="bg">#FFFFFF</color>
+    <color name="fg">#0F172A</color>
+    <color name="card">#FFFFFF</color>
+    <color name="muted">#F4F5F7</color>
+    <color name="muted_fg">#475569</color>
+    <color name="border">#E6E8EB</color>
+    <color name="primary">#DC2626</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="accent">#2563EB</color>
+    <color name="on_accent">#FFFFFF</color>
+    <color name="danger">#DC2626</color>
+    <color name="ok">#16A34A</color>
+    <color name="err_card_bg">#FEF4F4</color>
+    <color name="err_card_border">#F3C6C6</color>
+    <color name="stop_dark">#111827</color>
+</resources>

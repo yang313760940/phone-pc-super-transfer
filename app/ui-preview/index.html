@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VoiceSend · 录音发送 · UI 预览</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#DC2626; --on-primary:#fff; --accent:#2563EB; --on-accent:#fff;
+    --bg:#fff; --fg:#0F172A; --card:#fff; --muted:#F7F7F8; --muted-fg:#475569;
+    --border:#EAEAEC; --ring:#DC2626; --danger:#DC2626; --ok:#16A34A;
+    --radius:20px; --pad:20px;
+    --font:"Inter",-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0B0F14; --fg:#F1F5F9; --card:#151B23; --muted:#1B222B;
+      --muted-fg:#94A3B8; --border:#26303B; --on-primary:#fff; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e9ebee;font-family:var(--font);color:var(--fg);
+       display:flex;gap:28px;flex-wrap:wrap;padding:28px;align-items:flex-start;justify-content:center}
+  .stage{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .cap{font-size:13px;color:#64748b;font-weight:600}
+  /* phone frame */
+  .phone{width:390px;height:844px;background:var(--bg);border-radius:44px;
+    box-shadow:0 20px 60px rgba(15,23,42,.18),0 0 0 10px #0b0f14,0 0 0 12px #2a323d;
+    overflow:hidden;position:relative;display:flex;flex-direction:column}
+  .statusbar{height:44px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 26px;font-size:13px;font-weight:600;color:var(--fg);flex:none}
+  .appbar{display:flex;align-items:center;justify-content:space-between;
+    padding:6px 18px 10px;flex:none}
+  .appbar h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
+  .icon-btn{width:44px;height:44px;border-radius:22px;border:none;background:transparent;
+    display:grid;place-items:center;color:var(--muted-fg);cursor:pointer}
+  .icon-btn:hover{background:var(--muted)}
+  .body{flex:1;display:flex;flex-direction:column;padding:8px 20px 26px;min-height:0}
+  /* server chip */
+  .server{margin:4px 0 10px;padding:10px 14px;background:var(--muted);border:1px solid var(--border);
+    border-radius:14px;font-size:13px;color:var(--muted-fg);display:flex;align-items:center;gap:8px}
+  .server .dot{width:8px;height:8px;border-radius:4px;background:var(--ok);flex:none}
+  /* main recording zone */
+  .recordzone{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;min-height:0}
+  .recbtn{width:168px;height:168px;border-radius:84px;border:none;cursor:pointer;
+    background:var(--primary);color:#fff;display:grid;place-items:center;
+    box-shadow:0 14px 34px rgba(220,38,38,.34);transition:transform .12s ease, box-shadow .2s}
+  .recbtn:active{transform:scale(.97)}
+  .recbtn svg{width:66px;height:66px}
+  .recbtn.recording{background:#111827}
+  .hint{font-size:15px;color:var(--muted-fg);font-weight:500;text-align:center}
+  /* waveform */
+  .wave{display:flex;align-items:center;gap:5px;height:64px}
+  .wave span{width:6px;border-radius:3px;background:var(--accent);opacity:.9;height:30px}
+  .wave span:nth-child(1){height:18px}.wave span:nth-child(2){height:42px}
+  .wave span:nth-child(3){height:56px}.wave span:nth-child(4){height:34px}
+  .wave span:nth-child(5){height:48px}.wave span:nth-child(6){height:24px}
+  .wave span:nth-child(7){height:52px}.wave span:nth-child(8){height:38px}
+  .wave span:nth-child(9){height:58px}.wave span:nth-child(10){height:28px}
+  .wave span:nth-child(11){height:44px}.wave span:nth-child(12){height:20px}
+  .wave span:nth-child(13){height:36px}
+  .rec-timer{font-variant-numeric:tabular-nums;font-size:30px;font-weight:700;letter-spacing:1px;color:var(--fg)}
+  .rec-live{display:flex;align-items:center;gap:8px;color:var(--primary);font-weight:600;font-size:13px}
+  .rec-live .d{width:9px;height:9px;border-radius:5px;background:var(--primary);animation:pulse 1.2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  /* result card */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    padding:18px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  .card .lbl{font-size:12px;font-weight:700;letter-spacing:.6px;color:var(--muted-fg);text-transform:uppercase;margin-bottom:10px}
+  .result-text{font-size:19px;line-height:1.6;font-weight:500;color:var(--fg);white-space:pre-wrap;
+    max-height:230px;overflow:auto}
+  .result-actions{display:flex;gap:10px;margin-top:16px}
+  .btn{flex:1;height:52px;border-radius:14px;border:1px solid var(--border);background:var(--card);
+    color:var(--fg);font-size:16px;font-weight:600;font-family:inherit;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;transition:filter .15s}
+  .btn:hover{filter:brightness(.97)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.danger{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn.ghost{background:transparent}
+  .btn[disabled]{opacity:.45;cursor:default}
+  .btn svg{width:22px;height:22px}
+  /* status line */
+  .statusline{margin-top:14px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .statusline.ok{color:var(--ok)} .statusline.err{color:var(--danger)} .statusline.muted{color:var(--muted-fg)}
+  /* error card */
+  .errcard{border:1px solid #F3C6C6;background:#FEF4F4}
+  @media (prefers-color-scheme: dark){ .errcard{border-color:#4a2323;background:#2a1414} }
+  .errcard .etitle{color:var(--danger);font-weight:700;font-size:15px;margin-bottom:6px}
+  .errcard .edesc{font-size:14px;color:var(--muted-fg);line-height:1.5}
+  /* bottom big record (permanent) */
+  .bottombar{flex:none;display:flex;justify-content:center;padding-top:12px}
+  .mini-rec{width:84px;height:84px;border-radius:42px;border:none;background:var(--primary);color:#fff;
+    display:grid;place-items:center;box-shadow:0 10px 24px rgba(220,38,38,.32);cursor:pointer}
+  .mini-rec svg{width:36px;height:36px}
+  .spacer{flex:1}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+
+<!-- ============ 1) 就绪 ============ -->
+<div class="stage">
+  <div class="phone">
+    <div class="statusbar"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+    <div class="appbar">
+      <h1>录音发送</h1>
+      <button class="icon-btn" title="设置服务器地址" aria-label="设置服务器地址">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 3h-5l-.4 2.9a7 7 0 0 0-1.7 1l-2.3-1-2 3.4L2 11a7 7 0 0 0 0 2l-1.9 1.6 2 3.4 2.3-1a7 7 0 0 0 1.7 1L9.5 21h5l.4-3a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.6a7 7 0 0 0 .1-1z"/></svg>
+      </button>
+    </div>
+    <div class="body">
+      <div class="server"><span class="dot"></span>192.168.0.153:8443</div>
+      <div class="recordzone">
+        <div class="hint">点一下开始录音</div>
+        <button class="recbtn" aria-label="开始录音">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>
+        </button>
+        <div class="hint" style="color:var(--muted-fg);font-size:13px">录完自动发送到电脑转写</div>
+      </div>
+    </div>
+  </div>
+  <div class="cap">① 就绪</div>
+</div>
+
+<!-- ============ 2) 录音中（波形） ============ -->
+<div class="stage">
+  <div class="phone">
+    <div class="statusbar"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+    <div class="appbar">
+      <h1>录音发送</h1>
+      <button class="icon-btn" aria-label="设置服务器地址" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 3h-5l-.4 2.9a7 7 0 0 0-1.7 1l-2.3-1-2 3.4L2 11a7 7 0 0 0 0 2l-1.9 1.6 2 3.4 2.3-1a7 7 0 0 0 1.7 1L9.5 21h5l.4-3a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.6a7 7 0 0 0 .1-1z"/></svg>
+      </button>
+    </div>
+    <div class="body">
+      <div class="rec-live" style="margin:6px 0 2px"><span class="d"></span>录音中…</div>
+      <div class="recordzone">
+        <div class="rec-timer">00:04</div>
+        <div class="wave">
+          <span style="animation-delay:0s"></span><span style="animation-delay:.1s"></span>
+          <span style="animation-delay:.2s"></span><span style="animation-delay:.3s"></span>
+          <span style="animation-delay:.15s"></span><span style="animation-delay:.05s"></span>
+          <span style="animation-delay:.25s"></span><span style="animation-delay:.35s"></span>
+          <span style="animation-delay:.12s"></span><span style="animation-delay:.22s"></span>
+          <span style="animation-delay:.08s"></span><span style="animation-delay:.18s"></span>
+          <span style="animation-delay:.28s"></span>
+        </div>
+        <button class="recbtn recording" aria-label="停止并发送">
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>
+        </button>
+        <div class="hint" style="color:var(--muted-fg);font-size:13px">点一下停止并发送</div>
+      </div>
+    </div>
+  </div>
+  <div class="cap">② 录音中（波形）</div>
+</div>
+
+<!-- ============ 3) 转写完成（结果卡片） ============ -->
+<div class="stage">
+  <div class="phone">
+    <div class="statusbar"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+    <div class="appbar">
+      <h1>录音发送</h1>
+      <button class="icon-btn" aria-label="设置服务器地址">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 3h-5l-.4 2.9a7 7 0 0 0-1.7 1l-2.3-1-2 3.4L2 11a7 7 0 0 0 0 2l-1.9 1.6 2 3.4 2.3-1a7 7 0 0 0 1.7 1L9.5 21h5l.4-3a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.6a7 7 0 0 0 .1-1z"/></svg>
+      </button>
+    </div>
+    <div class="body">
+      <div class="server"><span class="dot"></span>192.168.0.153:8443</div>
+      <div class="card">
+        <div class="lbl">转写结果</div>
+        <div class="result-text">今天下午三点开会，请把手机语音转成文字发给我。</div>
+        <div class="result-actions">
+          <button class="btn primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            复制
+          </button>
+          <button class="btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+            再录一段
+          </button>
+        </div>
+      </div>
+      <div class="statusline ok"><span>✓</span>转写完成 · 2.0s</div>
+      <div class="spacer"></div>
+      <div class="bottombar">
+        <button class="mini-rec" aria-label="开始录音">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="cap">③ 转写完成</div>
+</div>
+
+<!-- ============ 4) 失败（错误 + 重试） ============ -->
+<div class="stage">
+  <div class="phone">
+    <div class="statusbar"><span>9:41</span><span>▮▮▮ ⌁ ▰</span></div>
+    <div class="appbar">
+      <h1>录音发送</h1>
+      <button class="icon-btn" aria-label="设置服务器地址">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 3h-5l-.4 2.9a7 7 0 0 0-1.7 1l-2.3-1-2 3.4L2 11a7 7 0 0 0 0 2l-1.9 1.6 2 3.4 2.3-1a7 7 0 0 0 1.7 1L9.5 21h5l.4-3a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.6a7 7 0 0 0 .1-1z"/></svg>
+      </button>
+    </div>
+    <div class="body">
+      <div class="server"><span class="dot" style="background:#DC2626"></span>192.168.0.153:8443</div>
+      <div class="card errcard" role="alert">
+        <div class="etitle">发送失败</div>
+        <div class="edesc">无法连接到电脑：连接超时。请确认电脑端服务已启动、手机与电脑在同一 Wi-Fi，且地址正确。</div>
+        <div class="result-actions">
+          <button class="btn danger">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+            重试
+          </button>
+          <button class="btn ghost">重新录音</button>
+        </div>
+      </div>
+      <div class="statusline err"><span>!</span>失败 · 网络或证书错误</div>
+      <div class="spacer"></div>
+      <div class="bottombar">
+        <button class="mini-rec" aria-label="开始录音">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="cap">④ 失败（错误 + 重试）</div>
+</div>
+
+</body>
+</html>
