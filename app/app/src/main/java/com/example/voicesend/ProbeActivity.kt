@@ -20,17 +20,17 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.io.File
-import java.security.KeyStore
-import java.security.cert.CertificateFactory
+import java.security.MessageDigest
 import java.security.cert.X509Certificate
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509TrustManager
 
 /**
- * 单屏录音发送 App（A 方案）。
+ * 单屏录音发送 App（A 方案 / 可分享版）。
  * 录音(MediaRecorder→AAC/m4a) → 自动 multipart 发到电脑 /upload → 显示可复制中文 → 失败重试。
- * 地址可配并记忆；证书 pinning 内置 cert.pem。
+ * 地址可配并记忆；证书采用「首次连接信任」（TOFU）：首次连某地址时记录服务端证书指纹，
+ * 之后只认这个指纹。一份 APK 可在任意同事电脑上通用，无需重新打包。
  */
 class ProbeActivity : AppCompatActivity() {
 
@@ -62,7 +62,7 @@ class ProbeActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(-1, -1)
         }
         urlInput = EditText(this).apply {
-            setText(getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_URL, "https://192.168.0.153:8443") ?: "")
+            setText(getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_URL, "") ?: "")
             hint = "服务器地址，如 192.168.0.153:8443"
         }
         recBtn = Button(this).apply { text = "开始录音" }
@@ -189,7 +189,8 @@ class ProbeActivity : AppCompatActivity() {
     private fun doUpload(urlStr: String, audio: ByteArray): UploadResult {
         val mp = buildMultipartBody(audio, filename = "clip.m4a", mimeType = "audio/mp4")
         val conn = java.net.URL(urlStr).openConnection() as HttpsURLConnection
-        conn.sslSocketFactory = pinnedContext().socketFactory
+        val host = java.net.URL(urlStr).host
+        conn.sslSocketFactory = tofuContext(host).socketFactory
         conn.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
         conn.requestMethod = "POST"
         conn.doOutput = true
@@ -204,13 +205,36 @@ class ProbeActivity : AppCompatActivity() {
         return parseUploadResponse(code, body)
     }
 
-    private fun pinnedContext(): SSLContext {
-        val cf = CertificateFactory.getInstance("X.509")
-        val cert = assets.open("cert.pem").use { cf.generateCertificate(it) as X509Certificate }
-        val ks = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null, null) }
-        ks.setCertificateEntry("voicesend", cert)
-        val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-            .apply { init(ks) }
-        return SSLContext.getInstance("TLS").apply { init(null, tmf.trustManagers, null) }
+    /**
+     * TOFU：按主机名信任服务端首次出示的证书指纹。
+     * - 首次连某 host：接受任意证书，并记录其 SHA-256 指纹（下次必须一致）。
+     * - 之后：只接受指纹匹配的证书，防止中间人换证。
+     */
+    private fun tofuContext(host: String): SSLContext {
+        val tm = object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
+                val leaf = chain[0]
+                val fp = sha256Hex(leaf.encoded)
+                val key = "certfp_$host"
+                val saved = getSharedPreferences(PREFS, MODE_PRIVATE).getString(key, null)
+                if (saved == null) {
+                    // 首次：记录指纹（TOFU）
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(key, fp).apply()
+                    Log.i("VoiceSend", "首次信任 $host 证书指纹 $fp")
+                } else if (saved != fp) {
+                    throw java.security.cert.CertificateException(
+                        "服务器证书已变化（指纹不一致），可能换了电脑或存在风险。如确认无误，请在系统设置中清除本应用数据后重连。"
+                    )
+                }
+            }
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        }
+        return SSLContext.getInstance("TLS").apply { init(null, arrayOf(tm), null) }
+    }
+
+    private fun sha256Hex(bytes: ByteArray): String {
+        val d = MessageDigest.getInstance("SHA-256").digest(bytes)
+        return d.joinToString("") { "%02x".format(it) }
     }
 }
