@@ -18,3 +18,9 @@ server/_lan_probe*
 # 插件缓存
 .dsh-mattskillsdeck-cache/
 .dsh-write-probe
+
+# 打包与分享产物（exe 本体 295MB，走分享包 zip，不入库）
+dist/
+dist_exe/
+build_exe/
+*.spec

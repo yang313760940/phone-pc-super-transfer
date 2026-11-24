@@ -18,12 +18,14 @@ from pathlib import Path
 
 MAX_BYTES = 25 * 1024 * 1024  # 单段上限 25 MB，规格契约。
 HERE = Path(__file__).resolve().parent
-WEB_ROOT = HERE.parent / "web"
+# 允许 exe 打包版用环境变量覆盖 Web 根与落地目录（默认沿用仓库内路径，测试/自用不变）
+WEB_ROOT = Path(os.environ.get("VOICE_WEB_ROOT", HERE.parent / "web"))
 STORE_DIR = Path(os.environ.get("VOICE_STORE_DIR", HERE / "uploads"))
+DATA_DIR = Path(os.environ.get("VOICE_DATA_DIR", HERE))
 
 # 实施票 #05：转写文字落到电脑——剪贴板 + 本地文件备份
-LATEST_TXT = HERE / "latest.txt"
-HISTORY_TXT = HERE / "history.txt"
+LATEST_TXT = DATA_DIR / "latest.txt"
+HISTORY_TXT = DATA_DIR / "history.txt"
 
 
 def _set_clipboard(text: str) -> bool:
