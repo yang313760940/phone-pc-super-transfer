@@ -1,5 +1,7 @@
 # Domain Docs
 
+Layout: **single-context** — one shared `GLOSSARY.md` at the repo root, architecture decisions in `docs/adr/`.
+
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
 ## Before exploring, read these
