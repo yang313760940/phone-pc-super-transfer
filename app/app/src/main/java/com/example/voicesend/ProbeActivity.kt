@@ -145,6 +145,7 @@ class ProbeActivity : AppCompatActivity() {
         recorder = null; recording = false
         recBtn.text = "开始录音"
         val f = recordFile
+        recordFile = null
         if (f == null || !f.exists() || f.length() == 0L) {
             status.text = "没录到音频，请重试"; return
         }
@@ -155,9 +156,10 @@ class ProbeActivity : AppCompatActivity() {
     private fun upload(file: File) {
         val url = normalizeServerUrl(urlInput.text.toString())
         if (url.isEmpty()) { status.text = "请先填服务器地址"; return }
-        // 保存地址
+        // 只存规范化后的地址，且回写输入框，避免再存未规范化原始串
+        urlInput.setText(url)
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-            .putString(KEY_URL, urlInput.text.toString().trim()).apply()
+            .putString(KEY_URL, url).apply()
         status.text = "发送中…"
         recBtn.isEnabled = false; retryBtn.isEnabled = false
         Thread {

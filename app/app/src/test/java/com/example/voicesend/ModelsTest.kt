@@ -102,4 +102,13 @@ class ModelsTest {
         assertTrue(r is UploadResult.Failure)
         assertTrue((r as UploadResult.Failure).message.contains("HTTP 500"))
     }
+
+    @Test
+    fun does_not_misfire_on_ok_substring_in_error() {
+        // 正文里出现 "broken" 这类含 ok 子串，不能被误判为成功
+        val body = "{\"ok\": false, \"error\": \"broken audio\", \"stage\": \"decode\"}"
+        val r = parseUploadResponse(422, body)
+        assertTrue(r is UploadResult.Failure)
+        assertTrue((r as UploadResult.Failure).message.contains("broken audio"))
+    }
 }

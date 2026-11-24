@@ -58,13 +58,10 @@ sealed class UploadResult {
  * - 非 JSON / 其它 → Failure(原始片段)
  */
 fun parseUploadResponse(httpCode: Int, body: String): UploadResult {
-    val okIdx = body.indexOf("\"ok\"")
-    if (okIdx >= 0) {
-        val ok = body.substring(okIdx).let { after ->
-            val c = after.substringAfter(":", "").trim().substringBefore(",")
-            c.startsWith("true")
-        }
-        if (ok) {
+    // 精确匹配顶层 "ok" 布尔值，避免误匹配 "broken" 等子串
+    val okMatch = Regex("\"ok\"\\s*:\\s*(true|false)").find(body)
+    if (okMatch != null) {
+        if (okMatch.groupValues[1] == "true") {
             val text = extractJsonString(body, "text")
             val dur = Regex("\"duration_ms\"\\s*:\\s*(-?\\d+)").find(body)?.groupValues?.get(1)?.toIntOrNull() ?: 0
             return UploadResult.Success(text, dur)
