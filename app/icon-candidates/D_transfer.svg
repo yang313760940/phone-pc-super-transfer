@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#DC2626"/>
+  <!-- D: 手机→电脑传输箭头 + 麦克风小标 -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="132" y="150" width="90" height="150" rx="16"/>
+    <rect x="300" y="212" width="130" height="96" rx="12"/>
+    <path d="M362 232 v56 M300 286 h130"/>
+    <path d="M250 262 h90 M320 240 l30 22 -30 22"/>
+  </g>
+  <g fill="#FFFFFF">
+    <rect x="168" y="176" width="18" height="44" rx="9"/>
+    <path d="M156 210 v6 a21 21 0 0 0 42 0 v-6" fill="none" stroke="#FFFFFF" stroke-width="10"/>
+  </g>
+</svg>

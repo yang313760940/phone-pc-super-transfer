@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#DC2626"/>
+  <!-- C: 声波转文字条（左侧波形渐变成右侧横线） -->
+  <g fill="#FFFFFF">
+    <rect x="120" y="150" width="16" height="60" rx="8"/>
+    <rect x="152" y="128" width="16" height="104" rx="8"/>
+    <rect x="184" y="168" width="16" height="24" rx="8"/>
+    <rect x="216" y="108" width="16" height="144" rx="8"/>
+  </g>
+  <g fill="#FFFFFF">
+    <rect x="270" y="176" width="130" height="22" rx="11"/>
+    <rect x="270" y="222" width="100" height="22" rx="11"/>
+    <rect x="270" y="268" width="130" height="22" rx="11"/>
+    <rect x="270" y="314" width="70" height="22" rx="11"/>
+  </g>
+</svg>
